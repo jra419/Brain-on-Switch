@@ -14,12 +14,12 @@ def main():
     # Dataset
     parser.add_argument("--dataset", default="ISCXVPN2016",
                         choices=["ISCXVPN2016", "BOTIOT", "CICIOT2022", "PeerRush"])
-    
+
     # Model options
     model_opts(parser)
     # Training options
     training_opts(parser)
-    
+
     args = parser.parse_args()
     # Set dataset & model path according to options
     args.train_path = '../dataset/{}/json/train.json'.format(args.dataset)
@@ -34,7 +34,7 @@ def main():
     with open('../dataset/{}/json/statistics.json'.format(args.dataset)) as fp:
         statistics = json.load(fp)
         args.labels_num = statistics['label_num']
-    
+
     set_seed(args.seed)
 
     # Build the binary RNN model & initialize parameters
@@ -59,7 +59,7 @@ def main():
 
     trainer = BRNNTrainer(args)
     trainer.train(args, gpu_id, train_loader, test_loader, model, optimizer, scheduler)
-    
+
 
 if __name__ == "__main__":
     main()

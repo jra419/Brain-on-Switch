@@ -42,7 +42,7 @@ def main():
             # sampling only an hour of capture in PeerRush dataset
             if args.dataset == 'PeerRush' and parent.find('00.clean') == -1:
                 continue
-            
+
             for file in files:
                 if file.find('.json') != -1:
                     samples_filename.append(os.path.join(parent, file))
@@ -71,7 +71,7 @@ def main():
         for sample in samples[split_idx:]:
             test_num_seg[label] += min(sample['packet_num'], 4096) - window_size + 1
         test_num_seg['sum'] += test_num_seg[label]
-    
+
     random.shuffle(train)
     random.shuffle(test)
     with open('./{}/json/train.json'.format(args.dataset), 'w') as fp:

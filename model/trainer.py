@@ -16,13 +16,13 @@ def build_optimizer(args, model):
         optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     else:
         optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-    
+
     return optimizer, None
 
 
 def build_data_loader(args, filename, batch_size, is_train=False, shuffle=True):
     dataset = FlowDataset(args, filename)
-    data_loader = DataLoader(dataset, batch_size=batch_size, 
+    data_loader = DataLoader(dataset, batch_size=batch_size,
                              shuffle=shuffle)
     print('The size of {}_set is {}.'.format(
             'train' if is_train else 'test', len(dataset)))
@@ -77,7 +77,7 @@ class BRNNTrainer(object):
         self.current_epoch = 0
         self.total_epochs = args.total_epochs
         self.save_checkpoint_epochs = args.save_checkpoint_epochs
-        
+
         self.labels_num = args.labels_num
         self.output_dir = args.output_dir
 
@@ -95,7 +95,7 @@ class BRNNTrainer(object):
 
         p_y = softmax[one_hot == 1]
         loss_y = - (1 - p_y) ** self.focal_loss_gamma * torch.log(p_y)
-        
+
         if self.loss_type == 'single':
             remove_p = one_hot.float()
             remove_p[remove_p == 1] = -torch.inf
@@ -106,7 +106,7 @@ class BRNNTrainer(object):
             p_others = softmax[one_hot == 0].reshape(shape=(len(softmax), self.labels_num - 1))
             loss_others = - p_others ** self.focal_loss_gamma * torch.log(1 - p_others)
             loss_others = torch.sum(loss_others, dim=1)
-        
+
         if self.weighted != 'unweighted':
             loss_y = alpha * loss_y
             loss_others = alpha * loss_others
@@ -114,7 +114,7 @@ class BRNNTrainer(object):
         loss_1 = torch.sum(loss_y) / len(softmax)
         loss_2 = torch.sum(loss_others) / len(softmax)
         loss = loss_1 + self.loss_factor * loss_2
-        
+
         return loss, logits, loss_1, loss_2
 
 
@@ -130,7 +130,7 @@ class BRNNTrainer(object):
             for batch in test_loader:
                 len_x_batch, ipd_x_batch, label_batch = batch2segs(args, batch, args.max_cluster_segs)
                 loss, logits, loss_1, loss_2 = self.forward_propagation(len_x_batch, ipd_x_batch, label_batch, model)
-                
+
                 test_samples += len_x_batch.shape[0]
                 test_total_loss += loss.item() * len_x_batch.shape[0]
                 test_total_loss_1 += loss_1.item() * len_x_batch.shape[0]
@@ -138,9 +138,9 @@ class BRNNTrainer(object):
                 pred = logits.max(dim=1, keepdim=True)[1]
                 for i in range(len(pred)):
                     conf_mat_test[label_batch[i].cpu(), pred[i].cpu()] += 1
-        
+
         return conf_mat_test, test_total_loss, test_total_loss_1, test_total_loss_2, test_samples
-            
+
 
     def train(self, args, train_loader, test_loader, model, optimizer):
         learning_curves = {
@@ -164,7 +164,7 @@ class BRNNTrainer(object):
             if self.current_epoch == self.total_epochs + 1:
                 return
             start_time = time.time()
-            
+
             # Train for an epoch
             model.train()
             train_samples = 0
@@ -190,7 +190,7 @@ class BRNNTrainer(object):
 
             # Validation
             conf_mat_test, test_total_loss, test_total_loss_1, test_total_loss_2, test_samples  = self.validate(args, test_loader, model)
-            
+
             # Report losses
             train_avg_loss = train_total_loss / train_samples
             train_avg_loss_1 = train_total_loss_1 / train_samples
@@ -207,12 +207,12 @@ class BRNNTrainer(object):
                     train_avg_loss, train_avg_loss_1, train_avg_loss_2,
                     test_avg_loss, test_avg_loss_1, test_avg_loss_2
                 ))
-            
+
             # Early Stopping
             status = early_stopping(test_total_loss / test_samples)
             if status == EARLY_STOP:
                 return
-            
+
             # Save model
             if status == BEST_SCORE_UPDATED or self.current_epoch % self.save_checkpoint_epochs == 0:
                 pres_train, recs_train, f1s_train, logs_train = metric_from_confuse_matrix(conf_mat_train)
@@ -222,16 +222,16 @@ class BRNNTrainer(object):
                 logs.append('Testing set: {} segs, average loss {}'.format(test_samples, test_avg_loss))
                 logs.extend(logs_test)
                 if status == BEST_SCORE_UPDATED:
-                    save_checkpoint(output_dir = self.output_dir, 
+                    save_checkpoint(output_dir = self.output_dir,
                                     model_name = 'brnn-best',
                                     model=model,
                                     result_log=logs)
                 if self.current_epoch % self.save_checkpoint_epochs == 0:
-                    save_checkpoint(output_dir = self.output_dir, 
+                    save_checkpoint(output_dir = self.output_dir,
                                     model_name = 'brnn-' + str(self.current_epoch),
                                     model=model,
                                     result_log=logs)
-            
+
             # Save learning curves
             learning_curves['train_loss'].append(train_avg_loss)
             learning_curves['train_loss_1'].append(train_avg_loss_1)

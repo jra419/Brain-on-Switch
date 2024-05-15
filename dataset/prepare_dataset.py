@@ -33,8 +33,9 @@ PeerRush_IP_filter = {
 
 
 def split_pcap_by_time(input_file, output_dir, time_interval, args):
-    time_interval = time_interval * 1e9 // 16384 / 1e9
-    os.mkdir(output_dir)    
+    # Comment the next line to fix the time interval according to the paper (256ms).
+    # time_interval = time_interval * 1e9 // 16384 / 1e9
+    os.mkdir(output_dir)
     flow_end_ts = -1
     flows = []  # [flow, ...]
     flow = []  # [(ts, pkt), ...]
@@ -44,7 +45,7 @@ def split_pcap_by_time(input_file, output_dir, time_interval, args):
         if flow_end_ts != -1 and ts - flow_end_ts > time_interval:
             # start of a new flow
             flows.append(flow)
-            flow = [(ts, pkt)]        
+            flow = [(ts, pkt)]
         else:
             flow.append((ts, pkt))
 
@@ -52,11 +53,11 @@ def split_pcap_by_time(input_file, output_dir, time_interval, args):
 
     if len(flow) != 0:
         flows.append(flow)
-    
+
     for flow in flows:
         if args.dataset in ['ISCXVPN2016']:
             linktype = DLT_RAW
-        else:    
+        else:
             linktype = DLT_EN10MB
         writer = dpkt.pcap.Writer(
                 open(output_dir + '/{}.pcap'.format(round(flow[0][0])), 'wb'), linktype=linktype
@@ -72,9 +73,9 @@ def main():
                         choices=["ISCXVPN2016", "BOTIOT", "CICIOT2022", "PeerRush"])
     args = parser.parse_args()
 
-    for p, dirs_label, _ in os.walk('./{}/raw_pcap'.format(args.dataset)):
+    for p, dirs_label, _ in os.walk('./{}/source'.format(args.dataset)):
         for dir_label in dirs_label:
-            tgt_dir = os.path.join(p.replace('raw_pcap', 'pcap'), dir_label)
+            tgt_dir = os.path.join(p.replace('source', 'pcap'), dir_label)
             if os.path.exists(tgt_dir):
                 shutil.rmtree(tgt_dir)
             os.mkdir(tgt_dir)
@@ -82,11 +83,11 @@ def main():
             print("---------- {}/{}".format(p, dir_label))
             for pp, _, files in os.walk(os.path.join(p, dir_label)):
                 for file in files:
-                    
-                    # filter for Idle traffic of CICIOT2022 dataset 
+
+                    # filter for Idle traffic of CICIOT2022 dataset
                     if args.dataset == 'CICIOT2022' and dir_label == 'Idle' and file != '2021_12_01_Idle.pcap':
                         continue
-                    
+
                     if args.dataset == 'PeerRush':
                         if dir_label == 'eMule' and '2011033000' not in file:
                             continue
@@ -105,23 +106,24 @@ def main():
                         file = file.replace('.pcapng', '.pcap')
                     if file.find('.pcap') == -1:
                         continue
-                    
+
                     org_file = os.path.join(pp, file)
                     clean_file = os.path.join(tgt_dir, file)
                     print(org_file + ' ...')
-                    
+
                     # remove DHCP etc.
                     os.system(f"tshark -F pcap -r \"{org_file}\" -Y {tshark_filter} -w {clean_file}")
 
                     # split by session & interval time
                     session_dir = clean_file.replace('.pcap', '')
-                    os.system(f"./SplitCap.exe -r {clean_file} -s session -o {session_dir} > /dev/null")
+                    os.system(f"mono SplitCap.exe -r {clean_file} -s session -o {session_dir} > /dev/null")
                     os.remove(clean_file)
                     for _, _, session_pcap_files in os.walk(session_dir):
                         for session_pcap_file in session_pcap_files:
                             session_pcap_file = os.path.join(session_dir, session_pcap_file)
                             segment_dir = session_pcap_file.replace(file + '.', '').replace('.pcap', '')
-                            split_pcap_by_time(session_pcap_file, segment_dir, interval_seconds[args.dataset], args, dir_label)
+                            # split_pcap_by_time(session_pcap_file, segment_dir, interval_seconds[args.dataset], args, dir_label)
+                            split_pcap_by_time(session_pcap_file, segment_dir, interval_seconds[args.dataset], args)
                             os.remove(session_pcap_file)
                         break
         break
